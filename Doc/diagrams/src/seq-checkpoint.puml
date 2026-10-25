@@ -1,0 +1,46 @@
+@startuml seq-checkpoint
+!include _style.iuml
+title シーケンス図③ 学習の再開とチェックポイントの保存（trainer_utils.py）
+autonumber
+
+participant "各ステージの学習\n(sft_train.py など)" as Train
+participant "BaseTrainer" as BT
+participant "load_checkpoint" as Load
+participant "save_checkpoint" as Save
+database "~*.pt" as Disk
+participant "MetricsLogger\nerrorLog/metrics/*.jsonl" as Metrics
+
+== 再開 ==
+Train -> BT : load_checkpoints()
+BT -> Load : 自ステージ（例: sft_checkpoint_TEST.pt）
+alt ファイルがない
+  Load --> BT : なし
+  BT -> Load : 前段ステージ（例: pretrain）
+  note right of BT
+    前段から読んだときは重みだけ使い、
+    エポック・ステップ・最適化の状態はリセット
+  end note
+else あるが読めない（破損・形が違う）
+  Load --> BT : CheckpointLoadError
+  BT --> Train : 停止（黙ってゼロから学習し直さない）
+else 読めた
+  Load --> BT : epoch・step・best_val_loss・data_size
+end
+BT -> BT : is_training_complete(data_size)\n学習データの件数が変わっていたら WARNING
+
+== 学習と保存 ==
+loop オプティマイザのステップごと
+  Train -> BT : step_and_save(loss, step, ...)
+  BT -> BT : 勾配の集約・クリップ（1.0）・更新
+  BT -> Metrics : loss・学習率・サンプル数
+  opt 保存のタイミング（エポック内の比率、または 30 分ごと）
+    BT -> Save : save_checkpoint(...)
+    Save -> Disk : <ckpt>.tmp に書き出す
+    Save -> Disk : os.replace で置き換える（アトミック）
+    alt 書き込みに失敗（ディスクの空き不足など）
+      Save -> Disk : .tmp を消す
+      Save --> BT : 例外（直前のチェックポイントは無傷）
+    end
+  end
+end
+@enduml

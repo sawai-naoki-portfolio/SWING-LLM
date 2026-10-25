@@ -1,0 +1,79 @@
+@startuml architecture
+!include _style.iuml
+title システム構成図 — SWING-LLM
+
+node "利用者の端末" {
+  component "ブラウザ\nWeb UI（web/static）" as Browser
+  component "モバイルアプリ（Flutter）\n※別リポジトリ・同じ API" as Mobile
+}
+
+node "開発者の PC（RTX 5070 12GB 想定・CPU でも動作）" {
+  component "run.bat → run.ps1\nパイプライン実行・評価ゲート\nチェックポイント管理・配信の起動" as Runner
+
+  node "Web サーバー（FastAPI / uvicorn・1 プロセス）" as Server {
+    component "SecurityGuardMiddleware\nHost・Origin・トークン検証" as Guard
+    component "RateLimitMiddleware\nトークンバケット・本文 12MB 上限" as Rate
+    component "routes/inference.py\n/api/generate(_stream)\n/api/llm/status・/api/feedback" as RInf
+    component "routes/voice.py\n/api/tts(_stream)・/api/asr\n/ws/voice-stream" as RVoice
+    component "routes/image.py\n/api/generate_image" as RImg
+    component "intent.py\nルールベースの意図検知" as Intent
+  }
+
+  package "swi_llm（自作 LLM）" {
+    component "core/models\nMiniLLM（MLA + MoE + MTP + PRM）\nVLM（自作 ViT）" as LLM
+    component "core/generation\nstream・CoT・Best-of-N・JSON 制約" as Gen
+    component "agent\nReAct・ツール・サンドボックス\nRAG（BM25 + 密検索）・Self-RAG" as Agent
+  }
+  package "swi_voice（自作 音声）" {
+    component "serve/tts.py\nAR / Flow / Hybrid" as TTS
+    component "safety\n同意チェック・電子透かし" as Safety
+    component "asr/whisper_asr.py\n※外部 Whisper" as ASR
+  }
+  package "swi_image（自作 画像）" {
+    component "serve/generate.py\nVAE + DiT + Rectified Flow" as ImgGen
+  }
+
+  database "チェックポイント\n~*.pt（学習で生成）" as Ckpt
+  folder "knowledge_base/\nRAG の文書" as KB
+  folder "errorLog/\nログ・メトリクス（JSONL）" as Logs
+}
+
+cloud "Hugging Face Hub\n学習データ" as HF
+cloud "天気（wttr.in）\nWikipedia API" as Ext
+
+Browser --> Guard : HTTP / WebSocket
+Mobile --> Guard : HTTP / WebSocket
+Guard --> Rate
+Rate --> RInf
+Rate --> RVoice
+Rate --> RImg
+RInf --> Intent
+Intent --> Agent
+RInf --> Gen
+Gen --> LLM
+Gen --> Agent
+Agent --> KB
+Agent --> Ext
+RVoice --> TTS
+TTS --> Safety
+RVoice --> ASR
+RImg --> ImgGen
+LLM ..> Ckpt : 読み込み
+TTS ..> Ckpt : 読み込み
+ImgGen ..> Ckpt : 読み込み
+Runner --> Server : serve
+Runner ..> Ckpt : 学習して保存
+Runner ..> HF : データ取得
+Server ..> Logs
+
+note right of Guard
+  0.0.0.0 で待ち受けるときに
+  許可ホストが未設定なら起動しない
+  （fail-closed）
+end note
+note bottom of Ckpt
+  学習前でも UI は起動する。
+  LLM はランダム重み（CRITICAL ログ）、
+  音声・画像は 503 を返す
+end note
+@enduml

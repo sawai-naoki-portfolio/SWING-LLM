@@ -1,0 +1,24 @@
+{"category": "math", "question": "2 + 2 はいくつですか？", "answer": "4"}
+{"category": "math", "question": "10 × 5 を計算してください。", "answer": "50"}
+{"category": "math", "question": "100 を 4 で割るといくつですか？", "answer": "25"}
+{"category": "math", "question": "7 の 2 乗はいくつですか？", "answer": "49"}
+{"category": "math", "question": "1/2 を小数で表すといくつですか？", "answer": "0.5"}
+{"category": "math", "question": "12 と 8 の最大公約数はいくつですか？", "answer": "4"}
+{"category": "math", "question": "3 + 4 × 2 はいくつですか？", "answer": "11"}
+{"category": "math", "question": "15 の 20% はいくつですか？", "answer": "3"}
+{"category": "knowledge", "question": "日本の首都はどこですか？", "answer": "東京"}
+{"category": "knowledge", "question": "水の化学式を書いてください。", "answer": "H2O"}
+{"category": "knowledge", "question": "太陽系で最も大きい惑星は何ですか？", "answer": "木星"}
+{"category": "knowledge", "question": "光の速度はおよそ秒速何万kmですか？（数字のみ）", "answer": "30"}
+{"category": "knowledge", "question": "富士山の標高はおよそ何メートルですか？（数字のみ）", "answer": "3776"}
+{"category": "knowledge", "question": "1年は何日ですか？（うるう年でない年）", "answer": "365"}
+{"category": "knowledge", "question": "アルファベットは全部で何文字ですか？", "answer": "26"}
+{"category": "reasoning", "question": "りんごが3個あり、2個食べました。残りは何個ですか？", "answer": "1"}
+{"category": "reasoning", "question": "1, 2, 3, 4 の次に来る数字は何ですか？", "answer": "5"}
+{"category": "reasoning", "question": "1週間は何日ですか？", "answer": "7"}
+{"category": "reasoning", "question": "2, 4, 6, 8 の次に来る数字は何ですか？", "answer": "10"}
+{"category": "reasoning", "question": "太郎は花子より背が高く、花子は次郎より背が高い。一番背が高いのは誰ですか？", "answer": "太郎"}
+{"category": "reasoning", "question": "5人が握手を1回ずつ全員とする場合、握手は何回ですか？", "answer": "10"}
+{"category": "code", "question": "Pythonでリストの要素数を返す組み込み関数は何ですか？", "answer": "len"}
+{"category": "code", "question": "Pythonで画面に文字を表示する組み込み関数は何ですか？", "answer": "print"}
+{"category": "code", "question": "2進数の 101 を10進数にするといくつですか？", "answer": "5"}

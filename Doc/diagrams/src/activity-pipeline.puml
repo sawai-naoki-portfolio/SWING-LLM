@@ -1,0 +1,62 @@
+@startuml activity-pipeline
+!include _style.iuml
+title アクティビティ図 学習パイプラインと評価ゲート（run.bat all TEST）
+
+start
+:run.bat all TEST\n→ run.ps1（モード・フラグ・ステージを解決）;
+note right
+  モード: TEST（数分）/ SMOKE / PROD（数時間）/ MAX（数日）
+  フラグ: ~--stage・~--from / ~--to・~--skip-*・~--fresh / ~--resume
+  ~--parallel・~--keep-going・~--dry-run・~--ci
+end note
+if (tokenizer.model がある?) then (ない)
+  :SentencePiece BPE を学習（語彙 32,768）;
+else (ある)
+endif
+
+fork
+  partition "音声（voice）" {
+    :tests（音声のユニットテスト）;
+    :codec（ニューラル音声コーデック）;
+    :tts（AR コーデック LM）;
+    :flow / hybrid（任意のエンジン）;
+    :eval\n再構成 SNR・コードブック使用率;
+    :check（パイプライン検証）;
+  }
+fork again
+  partition "画像（image）" {
+    :tests（画像のユニットテスト）;
+    :vae（ConvVAE）;
+    :dit（DiT + Rectified Flow）;
+    :eval\nPSNR の改善幅・生成のばらつき;
+    :check（パイプライン検証）;
+  }
+end fork
+note right
+  ~--parallel のときは並列、
+  既定は voice → image の順
+end note
+
+partition "LLM（llm）" {
+  :lint（ruff）→ typecheck（mypy）→ tests;
+  :data\nPII マスク・有害表現の除去・品質スコア\nMinHash LSH 重複除去・ベンチマーク汚染の除外;
+  if (SWI_PRETRAIN_TOKENS がある?) then (ある)
+    :corpus\nトークン予算コーパスを作る・続きから再開;
+  else (ない)
+  endif
+  :pretrain\nCE + MoE 補助損失 + MTP 損失;
+  :sft（対話・ツール呼び出しの教師）;
+  :vision（画像と説明文）;
+  :dpo（参照モデル = SFT）;
+  :grpo（検証器の報酬・DAPO）;
+  :eval / ppl-eval / fc-eval / rag-eval;
+  if (評価ゲートを満たす?) then (満たす)
+    :verify\nWeb UI を起動して E2E;
+  else (満たさない)
+    #FFE0E0:終了コード ≠ 0 で停止\n（~--keep-going なら続行して最後に集計）;
+    stop
+  endif
+}
+:サマリー（ステージごとの成否・時間）;
+stop
+@enduml

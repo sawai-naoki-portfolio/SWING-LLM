@@ -1,0 +1,63 @@
+# 静的解析（ruff・mypy）と LLM・音声・画像のユニットテストをプッシュごとに実行する。
+# ルールセットの単一情報源は prototype/pyproject.toml（run.bat の lint/typecheck ステージと共通）。
+#
+# 注意:
+#   - torch は CPU ホイールを使う（CI に GPU は無い。テストは device 自動選択で CPU でも通る設計）。
+#   - 学習・E2E（データ取得を伴う data/train/verify ステージ）は CI では回さない。
+#     それらのゲートはローカルの run.bat が担う（評価ゲート $EVAL_GATES）。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: prototype
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+
+      - name: Lint (ruff)
+        run: python -m ruff check .
+
+      - name: Type check (mypy, 段階導入セット)
+        run: python -m mypy
+
+      - name: LLM unit tests
+        env:
+          SWI_MODE: TEST
+        run: python -m tests.run_unit_tests
+
+      - name: Voice unit tests
+        env:
+          SWI_MODE: TEST
+        run: python -m tests.run_voice_unit_tests
+
+      - name: Image unit tests
+        env:
+          SWI_MODE: TEST
+        run: >
+          python -m unittest
+          tests.unit.test_image_vae tests.unit.test_image_dit
+          tests.unit.test_image_safety tests.unit.test_image_phash
+          tests.unit.test_image_vae_scale

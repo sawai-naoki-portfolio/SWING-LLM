@@ -1,0 +1,87 @@
+@startuml class-agent
+!include _style.iuml
+title クラス図② エージェントと RAG（swi_llm/agent・web/intent.py）
+hide empty members
+
+package "web" {
+  class "intent.py" as Intent <<module>> {
+    detect_and_execute_tool_detailed(prompt, agent)\n  : IntentToolOutcome?
+    format_tool_result_for_display(tool, result)
+  }
+  class IntentToolOutcome <<NamedTuple>> {
+    tool : str
+    result : dict
+    tool_response : str（プロンプトへ注入）
+  }
+}
+
+package "swi_llm/agent" {
+  class AgentBase {
+    tools : dict[名前 → 関数 + JSON Schema]
+    register_tool(name, func, schema)
+    get_system_prompt_addition() : str
+    process_llm_output_ex(text) : (応答, ok)
+  }
+  note right of AgentBase
+    <tool_call> を解析し、引数を JSON Schema で
+    検証してから ToolExecutor で実行する。
+    リクエストごとに作る（スレッド間で共有しない）。
+    成否は戻り値の ok で受け取る
+  end note
+
+  class ToolExecutor {
+    {static} execute_with_timeout(func, kwargs,\n  timeout_sec = 10)
+  }
+
+  class "tools.py" as Tools <<module>> {
+    calculate(expression)：AST で安全に評価
+    get_weather(location)：wttr.in
+    search_documents(query)
+    wikipedia_search(query)
+  }
+
+  class "sandbox.py" as Sandbox <<module>> {
+    execute_python(code)
+    _validate_code_ast(code)
+  }
+  note bottom of Sandbox
+    既定では登録しない（SWI_ENABLE_CODE_EXEC_TOOL=1 のときだけ）。
+    Docker（ネットワーク遮断・メモリ制限）→ 使えなければ
+    AST のホワイトリスト検査 + サブプロセス
+  end note
+
+  class SelfRAG {
+    rag : SimpleRAG
+    should_retrieve(query) : bool
+    retrieve(query, top_k = 2, force) : dict\n  {retrieved, grounded, results, grounding_score}
+  }
+
+  class SimpleRAG {
+    kb_dir : knowledge_base/
+    use_dense : bool（FAISS + 埋め込みがあるとき）
+    reranker : CrossEncoder?
+    search(query, top_k = 2, fetch_k = 30) : str
+    _load_and_index()
+    _try_load_cached_index(...)
+  }
+
+  class "chunking.py" as Chunking <<module>> {
+    semantic_chunk(document, max_tokens = 160)
+  }
+
+  class "rag.py" as RRF <<module>> {
+    reciprocal_rank_fusion(rankings, k = 60)
+  }
+}
+
+Intent ..> Tools : キーワードで直接呼ぶ
+Intent ..> AgentBase : 結果をプロンプト用に整形
+Intent ..> IntentToolOutcome
+AgentBase ..> ToolExecutor : 実行の境界
+AgentBase ..> Tools
+AgentBase ..> Sandbox
+Tools ..> SelfRAG : search_documents
+SelfRAG *-- SimpleRAG
+SimpleRAG ..> Chunking : 索引づくり
+SimpleRAG ..> RRF : BM25 と密検索を融合
+@enduml

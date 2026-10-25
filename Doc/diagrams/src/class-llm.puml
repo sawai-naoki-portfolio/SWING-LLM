@@ -1,0 +1,105 @@
+@startuml class-llm
+!include _style.iuml
+title クラス図① 自作 LLM（swi_llm/core）
+hide empty members
+
+package "core/models" {
+  class SWIVisionLanguageModel {
+    text_model : MiniLLM
+    vision_encoder : VisionEncoder
+    vision_projector : VisionProjector
+    video_encoder : VideoFrameEncoder?
+    forward(input_ids, images, videos, use_cache, ...)
+  }
+
+  class MiniLLM {
+    tok_embeddings : Embedding（語彙 32,768 → 768）
+    layers : TransformerBlock × 8
+    norm : RMSNorm
+    output : Linear（次トークン）
+    mtp_heads : Linear × 2（2・3 トークン先）
+    prm_head : Linear（途中経過の採点）
+    forward(tokens, start_pos, use_cache,\n  past_key_values, vision_features, return_mtp)
+  }
+
+  class TransformerBlock {
+    attention_norm / ffn_norm : RMSNorm
+    forward(x, freqs_cos, freqs_sin, use_cache, ...)
+  }
+
+  class MultiHeadLatentAttention {
+    wq
+    w_kv_down : dim 768 → 潜在 512
+    w_kv_up : 潜在 512 → K, V
+    q_norm / k_norm : RMSNorm（QK-Norm）
+    forward(x, freqs_cos, freqs_sin, ...)
+  }
+
+  class StaticMLACache {
+    c_kv_int8 : 潜在ベクトル（INT8）
+    scales : 位置ごとのスケール
+    update(c_kv_new)
+    rollback(length)
+  }
+
+  class SparseMoE {
+    gate : Linear（8 エキスパートの得点）
+    experts : SwiGLU × 8（top-2 を使う）
+    shared_experts : SwiGLU?（既定は無効）
+    z_loss_weight = 1e-4
+    forward(x) : (出力, 補助損失)
+  }
+
+  class SwiGLU {
+    forward(x)：線形成分を [-10, 10] にクランプ
+  }
+
+  class RMSNorm
+}
+
+package "core/vision.py" {
+  class VisionEncoder {
+    自作 ViT：224px・パッチ 16
+    埋め込み 768・12 層
+  }
+  class VisionProjector {
+    画像特徴 → LLM の次元
+  }
+  class VideoFrameEncoder
+}
+
+package "core/generation" {
+  class "stream.py" as Stream <<module>> {
+    generate_stream(...)：KV キャッシュ・プレフィックスキャッシュ\n  MTP の自己投機的デコード・ReAct
+    generate_o1_stream(...)：<think> で考えてから答える
+  }
+  class "best_of_n.py" as BoN <<module>> {
+    generate_best_of_n(model, ..., n=4)
+    score_with_prm(...)
+  }
+  class "structured.py" as Structured <<module>> {
+    is_valid_json_prefix(s)
+    generate_tool_call(...)：JSON として正しい形に制約
+  }
+}
+
+SWIVisionLanguageModel *-- MiniLLM
+SWIVisionLanguageModel *-- VisionEncoder
+SWIVisionLanguageModel *-- VisionProjector
+SWIVisionLanguageModel o-- VideoFrameEncoder
+MiniLLM *-- "8" TransformerBlock
+TransformerBlock *-- MultiHeadLatentAttention
+TransformerBlock *-- SparseMoE
+TransformerBlock *-- "2" RMSNorm
+SparseMoE *-- "8" SwiGLU
+MultiHeadLatentAttention ..> StaticMLACache : 推論時に使う
+Stream ..> SWIVisionLanguageModel
+BoN ..> MiniLLM : prm_head で採点
+Structured ..> MiniLLM
+
+note right of MiniLLM
+  総パラメータ 約 4.2 億
+  1 トークンあたりの活性 約 1.95 億
+  （MoE は 8 個中 2 個だけ動かす）
+end note
+@enduml

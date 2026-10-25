@@ -1,0 +1,90 @@
+@startuml class-serving
+!include _style.iuml
+title クラス図③ 音声・画像の配信と安全機構（swi_voice・swi_image）
+hide empty members
+
+package "swi_voice" {
+  class SWIVoiceTTS {
+    engine : "ar" | "flow" | "hybrid"（SWI_TTS_ENGINE）
+    codec : NeuralAudioCodec
+    model : ARCodecLM
+    flow_model : FlowTTS?
+    hybrid_model : HybridARFM?
+    synthesize(text, lang, ref_audio, ref_speaker_id) : WAV
+    synthesize_stream(...) : WAV チャンクの列
+    _prepare_inputs(...)：参照音声があれば同意ゲート
+    {static} _wav_bytes(wav)：全出力の唯一の出口（透かし）
+  }
+
+  class NeuralAudioCodec {
+    24kHz・50 フレーム / 秒
+    RVQ 8 段 × 1,024 エントリ
+  }
+  class ARCodecLM {
+    テキスト → 音響コード（VALL-E 系）
+    dim 512・6 層・8 ヘッド
+  }
+  class FlowTTS {
+    非自己回帰（F5 / E2 系）
+  }
+  class HybridARFM {
+    AR（意味トークン）→ FM（音響）
+  }
+
+  class "model/cloning.py" as Cloning <<module>> {
+    require_reference_consent(speaker_id)
+  }
+  class CloningConsentError <<PermissionError>>
+  class "safety/consent_check.py" as Consent <<module>> {
+    verify_speaker_consent(speaker_id, purpose) : bool
+    grant_consent(speaker_id, scope)
+  }
+  class ConsentLedger {
+    grant(speaker_id, scope, expires_at)
+    revoke(speaker_id)
+    is_usage_allowed(speaker_id, purpose) : bool
+  }
+  class "safety/watermark.py" as Watermark <<module>> {
+    apply_watermark(wave, payload)：PN 系列・α = 0.006
+    detect_watermark(wave) : str
+  }
+}
+
+package "swi_image" {
+  class SWIImageGenerator {
+    vae : ConvVAE
+    te : TextEncoder
+    dit : DiT
+    generate(prompt, steps = 28, cfg_scale = 4.0) : PNG
+  }
+  class ConvVAE {
+    画像 ⇄ 潜在（4ch・1/8 解像度）
+  }
+  class TextEncoder {
+    SentencePiece・最大 32 トークン
+  }
+  class DiT {
+    Rectified Flow の速度場
+    dim 384・6 層・パッチ 2
+  }
+}
+
+SWIVoiceTTS *-- NeuralAudioCodec
+SWIVoiceTTS *-- ARCodecLM
+SWIVoiceTTS o-- FlowTTS
+SWIVoiceTTS o-- HybridARFM
+SWIVoiceTTS ..> Cloning : 参照音声を使うとき
+Cloning ..> Consent
+Cloning ..> CloningConsentError : 同意なし → 送出（API は 403）
+Consent ..> ConsentLedger
+SWIVoiceTTS ..> Watermark : _wav_bytes で必ず通す
+
+SWIImageGenerator *-- ConvVAE
+SWIImageGenerator *-- TextEncoder
+SWIImageGenerator *-- DiT
+
+note bottom of SWIImageGenerator
+  学習データ側の安全機構（NSFW 判定・pHash 重複除去）は
+  swi_image/data/ にある。生成物の安全チェックは未実装（課題）
+end note
+@enduml

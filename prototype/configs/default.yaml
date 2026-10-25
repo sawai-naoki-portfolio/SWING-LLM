@@ -1,0 +1,42 @@
+# =====================================================================
+# SWI-LLM YAML 設定オーバーライド（問題3: Config 駆動アーキテクチャ）
+# =====================================================================
+# このファイルは swi_llm/utils/config.py の Python 既定値を「宣言的に上書き」するための
+# オプションのオーバーライド層です。既定では全項目コメントアウト＝何も上書きしない（no-op）。
+#
+# 使い方:
+#   - このファイルのキーをコメント解除して値を書くと、config.py の対応する辞書へ深いマージで反映されます。
+#   - 別ファイルを使う場合は環境変数 SWI_CONFIG=/path/to/your.yaml を指定してください（優先されます）。
+#   - pyyaml が無い / パース失敗 の場合は自動的に Python 既定値へフォールバックします（起動は壊れません）。
+#
+# 反映先: model_arch→MODEL_ARCH / training→TRAINING_CONFIG / inference→INFERENCE_CONFIG /
+#         vision→VISION_CONFIG / run→config（実行時の規模・接尾辞など）。
+
+# --- モデルアーキテクチャ（MODEL_ARCH） ---
+# model_arch:
+#   dim: 768
+#   n_layers: 8
+#   n_heads: 12
+#   hidden_dim: 2048
+#   num_experts: 8
+#   top_k: 2
+#   # DeepSeekMoE 拡張（有効化には新規学習が必要。C-1 互換のため既定 False）
+#   use_shared_experts: false
+#   use_aux_free_balancing: false
+
+# --- 学習ハイパーパラメータ（TRAINING_CONFIG, ステージ別に深いマージ） ---
+# training:
+#   pretrain:
+#     lr: 1.5e-4
+#     batch_size: 2
+#   sft:
+#     lr: 1.0e-4
+
+# --- 推論設定（INFERENCE_CONFIG） ---
+# inference:
+#   use_speculative_decoding: true
+
+# --- ビジョン設定（VISION_CONFIG） ---
+# vision:
+#   use_anyres: false
+#   anyres_max_side: 448

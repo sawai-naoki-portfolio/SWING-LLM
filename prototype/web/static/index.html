@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark" data-persona="jarvis">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="SWI — マルチモーダルAIスイート（対話・ツール実行・RAG・画像理解 / 生成・音声合成）の統合 Web UI">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#0d0d0f" id="theme-color">
+    <title>SWI · AI Suite</title>
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='.9em' font-size='18'%3E%F0%9F%A7%A0%3C/text%3E%3C/svg%3E">
+    <!-- ?v= はキャッシュバスティング。UI を更新したらこの値を上げること
+         （上げ忘れるとブラウザが旧 CSS/JS を再利用し「直したのに反映されない」事故になる）。 -->
+    <link rel="stylesheet" href="style.css?v=20260712">
+
+    <!-- Fonts / rich-rendering libs は progressive enhancement。
+         CDN がブロックされていても UI は素の状態で完全に動作する（script.js 側にフォールバックあり）。 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+<div class="app" id="app">
+
+    <!-- ═══════════════ Sidebar ═══════════════ -->
+    <aside class="sidebar" id="sidebar" aria-label="サイドバー">
+        <div class="sidebar__top">
+            <div class="brand">
+                <span class="brand__mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                </span>
+                <span class="brand__name">SWI</span>
+            </div>
+            <button class="iconbtn iconbtn--sm" id="sidebar-close" title="サイドバーを閉じる" aria-label="サイドバーを閉じる">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+
+        <button class="newchat" id="new-chat">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            新しいチャット
+        </button>
+
+        <nav class="sidebar__scroll" aria-label="チャット履歴">
+            <p class="sidebar__label">最近のチャット</p>
+            <ul class="chats" id="chat-list"></ul>
+            <p class="chats__empty" id="chat-empty">まだチャットはありません</p>
+        </nav>
+
+        <div class="sidebar__bottom">
+            <button class="sb-item" id="open-settings-2">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                設定
+            </button>
+            <div class="engines" id="engines" aria-label="エンジン状態">
+                <span class="engine is-checking" data-engine="llm"><i></i>LLM</span>
+                <span class="engine is-checking" data-engine="voice"><i></i>Voice</span>
+                <span class="engine is-checking" data-engine="image"><i></i>Image</span>
+            </div>
+        </div>
+    </aside>
+    <div class="scrim" id="scrim" hidden></div>
+
+    <!-- ═══════════════ Main ═══════════════ -->
+    <main class="main">
+        <header class="topbar">
+            <button class="iconbtn" id="sidebar-open" title="メニュー" aria-label="メニューを開く">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+
+            <button class="modelchip" id="model-chip" title="稼働中の推論バックエンド">
+                <span class="modelchip__dot" aria-hidden="true"></span>
+                <span class="modelchip__name" id="model-name">接続中…</span>
+                <span class="modelchip__tag" id="model-tag" hidden></span>
+            </button>
+
+            <div class="topbar__right">
+                <span class="persona-tag" id="persona-tag">JARVIS</span>
+                <button class="iconbtn" id="theme-toggle" title="テーマ切替" aria-label="テーマ切替">
+                    <svg class="i-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    <svg class="i-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><line x1="12" y1="1.5" x2="12" y2="3.5"/><line x1="12" y1="20.5" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="3.5" y2="12"/><line x1="20.5" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg>
+                </button>
+                <button class="iconbtn" id="open-settings" title="設定" aria-label="設定">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Thread -->
+        <section class="thread" id="thread" aria-live="polite" aria-label="会話">
+            <div class="hero" id="hero">
+                <div class="hero__mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                </div>
+                <h1 class="hero__title">今日は何をしましょうか</h1>
+                <p class="hero__sub" id="hero-sub">ツール実行・文書検索・画像・音声まで、ひとつの対話から。</p>
+                <div class="suggest" id="suggest">
+                    <button class="sug" data-prompt="128 × 46 を計算して">
+                        <span class="sug__ico">🧮</span>
+                        <span class="sug__t">計算させる</span>
+                        <span class="sug__d">ツールを自動で呼び出します</span>
+                    </button>
+                    <button class="sug" data-prompt="SWI-LLM のアーキテクチャについて、資料を検索して教えて">
+                        <span class="sug__ico">🔍</span>
+                        <span class="sug__t">資料を検索</span>
+                        <span class="sug__d">RAG で根拠つきに答えます</span>
+                    </button>
+                    <button class="sug" data-prompt="東京の今の天気は？">
+                        <span class="sug__ico">🌤️</span>
+                        <span class="sug__t">天気を調べる</span>
+                        <span class="sug__d">外部 API を呼び出します</span>
+                    </button>
+                    <button class="sug" data-prompt="Transformer の Attention を、初学者にもわかるように説明して">
+                        <span class="sug__ico">💡</span>
+                        <span class="sug__t">仕組みを解説</span>
+                        <span class="sug__d">段階的に噛み砕きます</span>
+                    </button>
+                </div>
+            </div>
+            <div class="messages" id="messages"></div>
+        </section>
+
+        <button class="scrollfab" id="scroll-fab" title="最新へ" aria-label="最新へスクロール" hidden>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+        </button>
+
+        <!-- Composer -->
+        <div class="composer">
+            <div class="composer__box" id="dropzone">
+                <div class="attachments" id="attachments" hidden></div>
+
+                <textarea id="prompt" rows="1" maxlength="4000"
+                          placeholder="SWI にメッセージを送信…"
+                          aria-label="メッセージ入力"></textarea>
+
+                <div class="composer__bar">
+                    <div class="composer__modes">
+                        <button type="button" class="iconbtn iconbtn--sm" id="attach" title="画像を添付" aria-label="画像を添付">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        </button>
+                        <button type="button" class="iconbtn iconbtn--sm" id="mic" title="音声で入力" aria-label="音声で入力">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                        </button>
+                        <input type="file" id="file-input" accept="image/*" hidden>
+
+                        <span class="vsep" aria-hidden="true"></span>
+
+                        <button type="button" class="mode" id="mode-cot" data-mode="cot" aria-pressed="false">🧠 思考</button>
+                        <button type="button" class="mode" id="mode-bon" data-mode="bon" aria-pressed="false">⭐ 高品質</button>
+                        <button type="button" class="mode" id="mode-imagegen" data-mode="imagegen" aria-pressed="false">🎨 画像生成</button>
+                        <button type="button" class="mode" id="mode-tts" data-mode="tts" aria-pressed="false">🔊 読み上げ</button>
+                    </div>
+
+                    <div class="composer__send">
+                        <span class="counter" id="char-count" hidden>0 / 4000</span>
+                        <button type="button" class="send" id="send" title="送信 (Enter)" aria-label="送信" disabled>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                        </button>
+                        <button type="button" class="send send--stop" id="stop" title="生成を停止" aria-label="生成を停止" hidden>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p class="composer__note">
+                <span class="composer__hint">Enter で送信 · Shift+Enter で改行 · 画像はドラッグ＆ドロップ</span>
+                <span class="composer__disc">SWI は誤った情報を生成することがあります。</span>
+            </p>
+        </div>
+    </main>
+</div>
+
+<!-- ═══════════════ Settings sheet ═══════════════ -->
+<div class="sheet" id="settings-sheet" hidden role="dialog" aria-modal="true" aria-label="設定">
+    <div class="sheet__scrim" id="settings-scrim"></div>
+    <div class="sheet__panel">
+        <header class="sheet__head">
+            <h2>設定</h2>
+            <button class="iconbtn iconbtn--sm" id="settings-close" title="閉じる" aria-label="閉じる">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </header>
+
+        <div class="sheet__body">
+            <section class="row">
+                <div class="row__text">
+                    <span class="row__t">AI ペルソナ</span>
+                    <span class="row__d">口調とアクセントカラーが変わります</span>
+                </div>
+                <select id="persona" aria-label="AIペルソナ">
+                    <option value="jarvis">JARVIS — 冷静・論理的</option>
+                    <option value="navi">NAVI — 明るく親しみやすい</option>
+                </select>
+            </section>
+
+            <section class="row" id="row-bon-n">
+                <div class="row__text">
+                    <span class="row__t">高品質モードの候補数</span>
+                    <span class="row__d">N 候補を生成し PRM 報酬モデルで最良を選抜します</span>
+                </div>
+                <select id="bon-n" aria-label="候補数">
+                    <option value="2">2</option>
+                    <option value="4" selected>4</option>
+                    <option value="8">8</option>
+                </select>
+            </section>
+
+            <div class="sheet__label">音声</div>
+
+            <section class="row">
+                <div class="row__text">
+                    <span class="row__t">読み上げエンジン</span>
+                    <span class="row__d" id="tts-engine-desc">ブラウザ内蔵か、自作の SWI-Voice を選べます</span>
+                </div>
+                <select id="tts-engine" aria-label="読み上げエンジン">
+                    <option value="browser">ブラウザ音声</option>
+                    <option value="swivoice">SWI-Voice</option>
+                </select>
+            </section>
+
+            <section class="row row--stack" id="row-voice-ref" hidden>
+                <div class="row__text">
+                    <span class="row__t">参照音声（ゼロショット話者クローン）</span>
+                    <span class="row__d">同意登録済みの話者 ID が必要です。未登録の声は 403 で拒否されます。</span>
+                </div>
+                <div class="refaudio">
+                    <button type="button" class="btn btn--ghost" id="voice-ref">音声ファイルを選択</button>
+                    <input type="file" id="voice-ref-input" accept="audio/*" hidden>
+                    <span class="refaudio__name" id="ref-audio-name" hidden></span>
+                    <input type="text" id="ref-speaker-id" class="input" placeholder="話者 ID" hidden>
+                    <button type="button" class="iconbtn iconbtn--sm" id="voice-ref-clear" title="参照音声をクリア" hidden>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </section>
+
+            <div class="sheet__label">接続</div>
+
+            <section class="row">
+                <div class="row__text">
+                    <span class="row__t">推論バックエンド</span>
+                    <span class="row__d" id="backend-desc">確認中…</span>
+                </div>
+                <span class="pill" id="backend-pill">—</span>
+            </section>
+
+            <div class="sheet__label">データ</div>
+
+            <section class="row">
+                <div class="row__text">
+                    <span class="row__t">チャット履歴</span>
+                    <span class="row__d">このブラウザ内にのみ保存されます（サーバーには送りません）</span>
+                </div>
+                <button type="button" class="btn btn--danger" id="clear-chats">すべて削除</button>
+            </section>
+        </div>
+    </div>
+</div>
+
+<div class="dropveil" id="drop-overlay" hidden>
+    <div class="dropveil__card">
+        <span class="dropveil__ico">🖼️</span>
+        画像をドロップして解析
+    </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="assertive"></div>
+
+<!-- defer は必須。<head> の marked / DOMPurify / highlight.js / KaTeX も defer なので、
+     defer 同士は「文書順」に実行される = ここに来る頃には window.marked 等が揃っている。
+     defer を外すと本スクリプトが先に走り、起動時の描画（履歴の復元）が必ず簡易 markdown
+     フォールバックに落ちて、表もシンタックスハイライトも失われる（2026-07-12 実測）。 -->
+<script defer src="script.js?v=20260712"></script>
+</body>
+</html>

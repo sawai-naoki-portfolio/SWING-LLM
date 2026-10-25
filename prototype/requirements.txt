@@ -1,0 +1,53 @@
+# ===== Core ML =====
+torch>=2.0.0
+torchvision
+numpy
+
+# ===== Audio (swi_voice / TTS) =====
+# torchaudio: resample (torchaudio.functional.resample)。soundfile: 音声デコード
+# (libsndfile 同梱・ffmpeg 非依存, wav/flac/mp3)。datasets 5.0 の Audio デコードは
+# torchcodec(FFmpeg共有ライブラリ)依存で環境差に弱いため soundfile で自前デコードする。
+torchaudio
+soundfile
+
+# ===== Tokenizer =====
+# SentencePiece BPE (語彙32k・日本語最適化)。旧 tiktoken 実装から移行 (§1.4)。
+sentencepiece
+
+# ===== Data pipeline / Training =====
+datasets
+tqdm
+scikit-learn
+Pillow
+
+# ===== Web serving (FastAPI stack) =====
+# 旧 Flask 実装は FastAPI に移行済みのため Flask / flask-cors は削除 (REQ-17)
+fastapi
+uvicorn[standard]
+pydantic
+
+# ===== RAG (swi_llm/agent/rag.py) =====
+# faiss-cpu: Dense 検索の IndexFlatIP。未導入だと BM25 のみへ無言で縮退し、
+#   test_rag_index の Dense 系テストが失敗する（CI 赤の原因）。
+#   本番の Dense 経路は別途 sentence-transformers（埋め込み + リランカ）も必要。
+faiss-cpu
+
+# ===== Agent tooling =====
+# ツール引数の JSON Schema 検証 (無い場合は簡易検証にフォールバック)
+jsonschema
+# execute_python のカーネルレベルサンドボックス (無い場合は AST 検査へフォールバック)
+docker
+
+# ===== Dev / CI: 静的解析ゲート (NEW-Q1) =====
+# 規則セットは prototype/pyproject.toml（run.bat の lint/typecheck ステージ・CI と共通）。
+ruff
+mypy
+
+# ===== Voice: ニューラル VAD / 実 ASR (fix 13 / fix 08, voice roadmap step2-3) =====
+# silero-vad: ニューラル VAD。モデル (~2MB) はパッケージ同梱でオフライン可。
+#   未導入なら RMS エネルギー方式へ自動縮退する (C-4)。
+silero-vad
+# faster-whisper: 実 ASR (CTranslate2 版 Whisper)。WER 評価・疑似ラベル・カスケード対話を実働化。
+#   モデル重みは初回に HF Hub から取得 (SWI_ASR_MODEL, 既定 small)。未導入なら該当機能は
+#   自動スキップ (C-4)。SWI_ASR=0 で明示無効化できる。
+faster-whisper

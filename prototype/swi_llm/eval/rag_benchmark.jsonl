@@ -1,0 +1,8 @@
+{"question": "SWI-LLM のパラメータ数はいくつですか？", "expect": "150M", "source": "sample_docs.md"}
+{"question": "SWI-LLM を開発したプロジェクトの名前は？", "expect": "Project Zenith", "source": "sample_docs.md"}
+{"question": "JARVIS と NAVI は何ですか？", "expect": "AIアシスタント", "source": "sample_docs.md"}
+{"question": "SWI-LLM は画像入力を理解できますか？", "expect": "Vision Language Model", "source": "sample_docs.md"}
+{"question": "社内最大規模の GPU クラスタの名前は？", "expect": "HOKUTO", "source": "sample_fictional_project.txt"}
+{"question": "Aurora-7 の開発予算はいくらですか？", "expect": "12億円", "source": "sample_fictional_project.txt"}
+{"question": "エッジ推論ユニットはどこと共同開発しましたか？", "expect": "ルミナ半導体", "source": "sample_fictional_project.txt"}
+{"question": "Aurora-LM とはどのような LLM ですか？", "expect": "対話型", "source": "sample_fictional_project.txt"}

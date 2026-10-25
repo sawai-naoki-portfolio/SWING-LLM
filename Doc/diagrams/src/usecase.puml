@@ -1,0 +1,50 @@
+@startuml usecase
+!include _style.iuml
+title ユースケース図 — SWING-LLM
+left to right direction
+
+actor "利用者" as User
+actor "開発者\n（学習・運用）" as Dev
+actor "GitHub Actions" as CI
+
+rectangle "SWI AI スイート" {
+  package "Web UI / API" {
+    usecase "AI と会話する\n（ストリーミング）" as UC1
+    usecase "考えてから答えさせる\n（思考モード）" as UC2
+    usecase "高品質モードで答えさせる\n（Best-of-N）" as UC3
+    usecase "計算・天気・文書検索を\n自動で実行させる" as UC4
+    usecase "画像を添付して質問する" as UC5
+    usecase "回答を読み上げさせる\n（TTS）" as UC6
+    usecase "参照音声の声で読み上げる\n（クローン・同意が必要）" as UC7
+    usecase "音声で入力する（ASR）" as UC8
+    usecase "画像を生成する" as UC9
+    usecase "回答を評価する（👍 / 👎）" as UC10
+  }
+  package "学習・運用（run.bat）" {
+    usecase "パイプラインを実行する\n（TEST / SMOKE / PROD / MAX）" as UC20
+    usecase "評価ゲートで合否を判定する" as UC21
+    usecase "チェックポイントを管理する" as UC22
+    usecase "Web UI を起動する" as UC23
+  }
+  usecase "静的解析と\nユニットテストを実行する" as UC30
+}
+
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+User --> UC6
+User --> UC7
+User --> UC8
+User --> UC9
+User --> UC10
+UC7 ..> UC6 : <<extend>>
+
+Dev --> UC20
+Dev --> UC22
+Dev --> UC23
+UC20 ..> UC21 : <<include>>
+UC20 ..> UC30 : <<include>>
+CI --> UC30
+@enduml

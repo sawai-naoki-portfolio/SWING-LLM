@@ -1,0 +1,55 @@
+@startuml seq-chat
+!include _style.iuml
+title シーケンス図① 会話：意図検知・ストリーミング生成・ツール呼び出し（ReAct）
+autonumber
+
+actor "利用者" as User
+participant "Web UI\n(script.js)" as UI
+participant "SecurityGuard\n+ RateLimit" as MW
+participant "routes/inference.py\n/api/generate_stream" as Route
+participant "intent.py" as Intent
+participant "generation/stream.py\ngenerate_stream" as Gen
+participant "MiniLLM / VLM" as Model
+participant "AgentBase\n+ ToolExecutor" as Agent
+participant "tools.py\n（計算・天気・文書検索）" as Tools
+
+User -> UI : 「128 × 46 を計算して」を送信
+UI -> MW : POST {prompt, history, persona, use_cot, images}
+MW -> MW : Host・Origin・トークン・レート制限・本文の大きさ
+MW -> Route
+Route -> Route : 入力の検証（4,000 文字まで）\nペルソナのシステムプロンプト + 履歴（8 ターン）で ChatML を組む
+
+group ルールベースの先回り（スレッドプールで実行）
+  Route -> Intent : detect_and_execute_tool_detailed(prompt)
+  Intent -> Tools : calculate("128 * 46")
+  Tools --> Intent : {result: 5888}
+  Intent --> Route : IntentToolOutcome
+  Route --> UI : ツール結果の枠を先に送る
+  UI -> User : 「計算結果: 128 * 46 = 5888」を表示
+  Route -> Route : ツール結果をプロンプトへ注入
+end
+
+Route -> Gen : 別スレッドで生成開始（stop_event 付き）
+loop 1 トークンずつ（KV キャッシュ・MTP の自己投機的デコード）
+  Gen -> Model : forward(tokens, use_cache=True, return_mtp)
+  Model --> Gen : logits（+ 2・3 トークン先の下書き）
+  Gen --> Route : 差分テキスト
+  Route --> UI : ストリームで逐次送信
+  opt モデルが <tool_call>{...}</tool_call> を出した（最大 3 回まで）
+    Gen -> Gen : JSON が壊れていれば\n制約デコード（generate_tool_call）で作り直す
+    Gen -> Agent : process_llm_output_ex(text)
+    Agent -> Agent : 解析・引数を JSON Schema で検証
+    Agent -> Tools : execute_with_timeout(func, args, 10 秒)
+    Tools --> Agent : 結果（例外はエラーの JSON）
+    Agent --> Gen : <|im_start|>tool ... を KV キャッシュに追記して生成を続ける
+  end
+end
+
+alt 利用者が停止ボタン・タブを閉じた
+  UI -> Route : 接続を切る
+  Route -> Gen : stop_event.set()（ワーカーを早く止める）
+end
+Gen --> Route : 終了
+Route --> UI : 完了
+UI -> UI : 会話をブラウザ（localStorage）に保存
+@enduml

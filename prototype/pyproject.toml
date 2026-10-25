@@ -1,0 +1,43 @@
+# =====================================================================
+# 静的解析の設定 (NEW-Q1 / 04_Quality_and_Standards §3)
+# run.ps1 の lint / typecheck ステージと .github/workflows/ci.yml が参照する。
+# [build-system] を持たないツール設定専用ファイル（pip の挙動には影響しない）。
+# =====================================================================
+
+[tool.ruff]
+target-version = "py312"
+# arxiv_papers はデータ資産（.txt 主体）。走査コスト削減のため明示除外。
+extend-exclude = ["swi_llm/data/arxiv_papers"]
+
+[tool.ruff.lint]
+# ゲート方針: 「現状のコードベースで緑」かつ「実バグ検出力が高い」規則から始める。
+# 導入時 (2026-07-17) にこの規則セットだけで実バグ 8 件を検出した:
+#   - F821 ×5: ar_codec_lm.py の到達不能な初期化ログが未定義変数を参照
+#   - F811 ×3: train/dpo_train の import 重複・trainer_utils の再 import
+# 拡大パス（緑を保ちながら段階導入）: F401 (未使用 import) → E7xx → B (bugbear)。
+# ruff format（black 相当）は全体差分が大きいため未ゲート — 導入判断は別途。
+select = [
+    "E9",     # 構文エラー・実行不能コード
+    "F63",    # 常に真/偽になる比較・演算の誤り
+    "F7",     # return/yield/break の文法的誤用
+    "F821", "F822", "F823",   # 未定義名の参照
+    "F811",   # 再定義（デッドコードの兆候）
+]
+
+[tool.mypy]
+python_version = "3.12"
+# torch/transformers 等のスタブ欠落で赤にしない。段階導入のため、対象ファイル以外
+# （import 先）で見つかったエラーは報告しない (follow_imports=silent)。
+ignore_missing_imports = true
+follow_imports = "silent"
+# 型チェックの enforced セット（NEW-Q1 導入時点で緑）。新規モジュールから登録し、
+# 触ったファイルを随時追加して全体へ広げる（04 §2「型ヒント必須」への段階適用）。
+files = [
+    "swi_voice/data/quality_filter.py",
+    "swi_voice/duplex/vad.py",
+    "swi_voice/asr/whisper_asr.py",
+    "swi_image/data/phash.py",
+    "swi_image/data/safety_filter.py",
+    "swi_llm/data/token_corpus.py",
+    "swi_llm/eval/perplexity.py",
+]

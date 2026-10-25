@@ -1,0 +1,44 @@
+@startuml seq-tts-clone
+!include _style.iuml
+title シーケンス図② 読み上げと声のクローン（同意ゲート・電子透かし）
+autonumber
+
+actor "利用者" as User
+participant "Web UI" as UI
+participant "routes/voice.py\n/api/tts_stream・/api/tts" as Route
+participant "SWIVoiceTTS" as TTS
+participant "cloning.py\nrequire_reference_consent" as Gate
+participant "ConsentLedger\n（同意台帳）" as Ledger
+participant "ARCodecLM\n+ NeuralAudioCodec" as Model
+participant "watermark.py" as WM
+
+User -> UI : 参照音声と話者 ID を設定して「読み上げ」
+UI -> Route : POST {text, ref_audio(base64), ref_speaker_id}
+Route -> Route : 文字数・参照音声の大きさと形式を検証
+Route -> TTS : synthesize(...)（スレッドプール）
+
+alt 音声モデルが未学習
+  TTS --> Route : FileNotFoundError
+  Route --> UI : 503
+  UI -> UI : ブラウザ内蔵の音声合成で読み上げる
+else 学習済み
+  TTS -> Gate : 参照音声を復号する前に同意を確認
+  Gate -> Ledger : is_usage_allowed(speaker_id, "voice_cloning")
+  alt 同意なし
+    Ledger --> Gate : false
+    Gate --> TTS : CloningConsentError
+    TTS --> Route : 例外（黙ってクローンなしに切り替えない）
+    Route --> UI : 403
+    UI -> User : 同意が必要とトーストで知らせ、ブラウザの音声で読み上げる
+  else 同意あり
+    Ledger --> Gate : true
+    TTS -> Model : 参照音声 → 音響コード（プロンプト）\nテキスト → 音響コードを生成 → 波形
+    Model --> TTS : 波形（24kHz）
+    TTS -> WM : apply_watermark(波形)（すべての出力が通る唯一の出口）
+    WM --> TTS : 透かし入りの波形
+    TTS --> Route : WAV（16bit）
+    Route --> UI : WAV（ストリームは 16 フレームごとのチャンク）
+    UI -> User : 再生
+  end
+end
+@enduml
